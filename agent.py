@@ -235,6 +235,9 @@ class Mario:
         if self.curr_step % self.learn_every != 0:
             return None, None
 
+        if len(self.memory) < self.batch_size:
+            return None, None
+
         # Sample from memory
         state, next_state, action, reward, done = self.recall()
 
@@ -266,7 +269,7 @@ class Mario:
             save_path,
         )
 
-        print(f"MarioNet saved to {save_path} at step {self.curr_step}")
+        # print(f"MarioNet saved to {save_path} at step {self.curr_step}")
 
     def load(self, load_path):
         if not load_path.exists():

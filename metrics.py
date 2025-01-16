@@ -2,7 +2,8 @@ import numpy as np
 import time, datetime
 import matplotlib.pyplot as plt
 
-class MetricLogger():
+
+class MetricLogger:
     def __init__(self, save_dir):
         self.save_log = save_dir / "log"
         with open(self.save_log, "w") as f:
@@ -33,7 +34,6 @@ class MetricLogger():
 
         # Timing
         self.record_time = time.time()
-
 
     def log_step(self, reward, loss, q):
         self.curr_ep_reward += reward
@@ -75,22 +75,21 @@ class MetricLogger():
         self.moving_avg_ep_avg_losses.append(mean_ep_loss)
         self.moving_avg_ep_avg_qs.append(mean_ep_q)
 
-
         last_record_time = self.record_time
         self.record_time = time.time()
         time_since_last_record = np.round(self.record_time - last_record_time, 3)
 
-        print(
-            f"Episode {episode} - "
-            f"Step {step} - "
-            f"Epsilon {epsilon} - "
-            f"Mean Reward {mean_ep_reward} - "
-            f"Mean Length {mean_ep_length} - "
-            f"Mean Loss {mean_ep_loss} - "
-            f"Mean Q Value {mean_ep_q} - "
-            f"Time Delta {time_since_last_record} - "
-            f"Time {datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}"
-        )
+        # print(
+        #     f"Episode {episode} - "
+        #     f"Step {step} - "
+        #     f"Epsilon {epsilon} - "
+        #     f"Mean Reward {mean_ep_reward} - "
+        #     f"Mean Length {mean_ep_length} - "
+        #     f"Mean Loss {mean_ep_loss} - "
+        #     f"Mean Q Value {mean_ep_q} - "
+        #     f"Time Delta {time_since_last_record} - "
+        #     f"Time {datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}"
+        # )
 
         with open(self.save_log, "a") as f:
             f.write(
