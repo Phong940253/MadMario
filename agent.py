@@ -23,7 +23,7 @@ class Mario:
         self.learn_every = 3  # no. of experiences between updates to Q_online
         self.sync_every = 1e4  # no. of experiences between Q_target & Q_online sync
 
-        self.save_every = 5e5  # no. of experiences between saving Mario Net
+        self.save_every = 5e4  # no. of experiences between saving Mario Net
         self.save_dir = save_dir
 
         self.use_cuda = torch.cuda.is_available()
@@ -36,6 +36,8 @@ class Mario:
                     "time_left": 0,
                     "coins": 0,
                 }
+        self.max_world = 1
+        self.max_stage = 1
 
         # Mario's DNN to predict the most optimal action - we implement this in the Learn section
         self.net = MarioNet(self.state_dim, self.action_dim).float()
@@ -46,6 +48,29 @@ class Mario:
 
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.00025)  # type: ignore
         self.loss_fn = torch.nn.SmoothL1Loss()
+
+    def visualize_weights(self):
+        """
+        Extract the weights of the first convolutional layer and reshape them to match the input dimensions.
+        """
+        with torch.no_grad():
+            weights = self.net.online[0].weight.cpu().clone()
+            # Assuming input is 1 channel, output is 32 channels, kernel size is 8x8
+            # weights shape is (32, 1, 8, 8)
+            # Reshape weights to (32, 8, 8)
+            weights = weights.squeeze(1)
+            # Normalize weights to [0, 1]
+            weights_min = weights.min()
+            weights_max = weights.max()
+            weights = (weights - weights_min) / (weights_max - weights_min)
+            # Resize weights to 84x84
+            weights = torch.nn.functional.interpolate(
+                weights.unsqueeze(1),
+                size=(84, 84),
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(1)
+            return weights
 
     def reset_max(self, world, stage):
         self.max_dict[(world, stage)] = {
@@ -67,6 +92,11 @@ class Mario:
                 self.max_dict[(world, stage)]["time_left"] = info["time_left"]
         if info["coins"] > self.max_dict[(world, stage)]["coins"]:
             self.max_dict[(world, stage)]["coins"] = info["coins"]
+        if world > self.max_world:
+            self.max_world = world
+            self.max_stage = stage
+        if world == self.max_world and stage > self.max_stage:
+            self.max_stage = stage
 
     def get_max(self, world, stage):
         return self.max_dict[(world, stage)]

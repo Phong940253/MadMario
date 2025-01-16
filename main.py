@@ -49,7 +49,7 @@ screen = pygame.display.set_mode((256 * 2, 240 * 2 * 2))
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 30)
 
-BUTTON_LIST = ["A", "B", "right", "left", "down", "up"]
+BUTTON_LIST = ["A", "B", "up", "down", "left", "right"]
 
 button_width = 40
 button_height = 20
@@ -99,9 +99,10 @@ mario = Mario(
 
 logger = MetricLogger(save_dir)
 
-episodes = 40000
+episodes = 100000
 worlds = range(1, 9)
 stages = range(1, 5)
+visualize = True
 
 ### for Loop that train the model num_episodes times by playing the game
 for e in range(episodes):
@@ -119,69 +120,95 @@ for e in range(episodes):
                 pygame.quit()
                 exit()
 
-        # 3. Show environment (the visual)
-        # from (4, 240, 256, 3) to (240, 256, 3)
-        frame = rbg_state[0]
-        frame = np.transpose(frame, (1, 0, 2))
-        surface = pygame.surfarray.make_surface(frame)
-        scaled_surface = pygame.transform.scale(surface, (game_width, game_height))
+        if visualize:
+            # 3. Show environment (the visual)
+            # from (4, 240, 256, 3) to (240, 256, 3)
+            frame = rbg_state[0]
+            frame = np.transpose(frame, (1, 0, 2))
+            surface = pygame.surfarray.make_surface(frame)
+            scaled_surface = pygame.transform.scale(surface, (game_width, game_height))
 
-        # Center the game display in the window
-        screen.fill((0, 0, 0))  # Clear the screen with a black background
-        screen.blit(scaled_surface, (offset_x, offset_y))
+            # Center the game display in the window
+            screen.fill((0, 0, 0))  # Clear the screen with a black background
+            screen.blit(scaled_surface, (offset_x, offset_y))
 
-        # 4. Run agent on the state
+            # 4. Run agent on the state
         action = mario.act(state)
-        action_list = COMPLEX_MOVEMENT[action]
 
-        for i, button in enumerate(buttons):
-            # Draw button border
-            pygame.draw.ellipse(screen, (0, 0, 0), button.inflate(0, 1))
+        if visualize:
+            action_list = COMPLEX_MOVEMENT[action]
 
-            # Draw button background
-            if BUTTON_LIST[i] in action_list:
-                pygame.draw.ellipse(
-                    screen, (255, 255, 0), button.inflate(-4, -4)
-                )  # Highlight active button
-            else:
-                pygame.draw.ellipse(
-                    screen, (100, 100, 100), button.inflate(-4, -4)
-                )  # Inactive button
+            for i, button in enumerate(buttons):
+                # Draw button border
+                pygame.draw.ellipse(screen, (0, 0, 0), button.inflate(0, 1))
 
-            text_surface = small_font.render(BUTTON_LIST[i], True, (255, 255, 255))
-            text_rect = text_surface.get_rect(center=button.center)
-            screen.blit(text_surface, text_rect)
+                # Draw button background
+                if BUTTON_LIST[i] in action_list:
+                    pygame.draw.ellipse(
+                        screen, (255, 255, 0), button.inflate(-4, -4)
+                    )  # Highlight active button
+                else:
+                    pygame.draw.ellipse(
+                        screen, (100, 100, 100), button.inflate(-4, -4)
+                    )  # Inactive button
+
+                text_surface = small_font.render(BUTTON_LIST[i], True, (255, 255, 255))
+                text_rect = text_surface.get_rect(center=button.center)
+                screen.blit(text_surface, text_rect)
 
         # 5. Agent performs action
         next_state, reward, done, info = env.step(action)
         mario.update_max(info)
         current_max = mario.get_max(info["world"], info["stage"])
 
-        hud_text = f"Episode: {e}, "
-        if mario.curr_step < 1e5:
-            hud_text += f"Exploring mode, "
-        else:
-            hud_text += "Learning mode, "
-        hud_text += f"Step: {mario.curr_step}, Reward: {reward}"
+        if visualize:
+            hud_text = f"Episode: {e}, "
+            if mario.curr_step < 1e5:
+                hud_text += f"Exploring mode, "
+            else:
+                hud_text += "Learning mode, "
+            hud_text += f"Step: {mario.curr_step}, Reward: {reward}"
+            # compare with max_x_pos
+            ratio = round(info["x_pos"] / current_max.get("x_pos", 1) * 100, 2)
 
-        details_hub_text_1 = (
-            f"Max X pos: {current_max['x_pos']}, Max Score: {current_max['score']}"
-        )
-        details_hub_text_2 = f"Max Coins: {current_max['coins']}, Max Time Left: {current_max['time_left']}"
+            details_hub_text_1 = f"Max length: {current_max['x_pos']}, Max Score: {current_max['score']}, Max Coins: {current_max['coins']}"
+            details_hub_text_2 = f"Max Time Left: {current_max['time_left']}, Best World: {mario.max_world}, Best Stage: {mario.max_stage}"
+            details_hub_text_3 = f"Compare with best: {ratio}%"
+            details_hub_text_4 = "Episode remaining: " + str(episodes - e) + " episodes"
 
-        hud_surface = normal_font.render(hud_text, True, (255, 255, 255))
-        details_surface_1 = normal_font.render(
-            details_hub_text_1, True, (255, 255, 255)
-        )
-        details_surface_2 = normal_font.render(
-            details_hub_text_2, True, (255, 255, 255)
-        )
-        screen.blit(hud_surface, (10, 10))
-        screen.blit(details_surface_1, (10, 40))
-        screen.blit(details_surface_2, (10, 70))
+            hud_surface = normal_font.render(hud_text, True, (255, 255, 255))
+            details_surface_1 = normal_font.render(
+                details_hub_text_1, True, (255, 255, 255)
+            )
+            details_surface_2 = normal_font.render(
+                details_hub_text_2, True, (255, 255, 255)
+            )
+            details_surface_3 = normal_font.render(
+                details_hub_text_3, True, (255, 255, 255)
+            )
+            details_surface_4 = normal_font.render(
+                details_hub_text_4, True, (255, 255, 255)
+            )
 
-        pygame.display.flip()
-        clock.tick(60)
+            screen.blit(hud_surface, (10, 10))
+            screen.blit(details_surface_1, (10, 40))
+            screen.blit(details_surface_2, (10, 70))
+            screen.blit(details_surface_3, (10, 100))
+            screen.blit(details_surface_4, (10, 160))
+
+            # Visualize weights
+            weights = mario.visualize_weights()
+            weights = (weights.cpu().numpy() * 255).astype(np.uint8)
+            for i in range(weights.shape[0]):
+                weight_surface = pygame.surfarray.make_surface(weights[i])
+                weight_surface = pygame.transform.scale(weight_surface, (84, 84))
+                # print((game_width + 10 + (i % 4) * 90, 10 + (i // 4) * 90))
+                screen.blit(
+                    weight_surface, (game_width + 10 + (i % 4) * 90, 10 + (i // 4) * 90)
+                )
+
+            pygame.display.update()
+            clock.tick(60)
 
         # 6. Remember
         mario.cache(state, next_state, action, reward, done)
