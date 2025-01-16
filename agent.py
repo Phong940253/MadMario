@@ -18,6 +18,7 @@ class Mario:
         self.exploration_rate_min = 0.1
         self.gamma = 0.9
 
+        self.curr_episode = 0
         self.curr_step = 0
         self.burnin = 1e5  # min. experiences before training
         self.learn_every = 3  # no. of experiences between updates to Q_online
@@ -79,6 +80,14 @@ class Mario:
             "time_left": 0,
             "coins": 0,
         }
+        self.max_world = 1
+        self.max_stage = 1
+
+    def reset_max_all(self):
+        self.max_dict = dict()
+        for world in range(1, 9):
+            for stage in range(1, 5):
+                self.reset_max(world, stage)
 
     def update_max(self, info, win=False):
         world = info["world"]
@@ -245,9 +254,18 @@ class Mario:
             self.save_dir / f"mario_net_{int(self.curr_step // self.save_every)}.chkpt"
         )
         torch.save(
-            dict(model=self.net.state_dict(), exploration_rate=self.exploration_rate),
+            dict(
+                model=self.net.state_dict(),
+                exploration_rate=self.exploration_rate,
+                max_dict=self.max_dict,
+                max_world=self.max_world,
+                max_stage=self.max_stage,
+                step=self.curr_step,
+                episodes=self.curr_episode,
+            ),
             save_path,
         )
+
         print(f"MarioNet saved to {save_path} at step {self.curr_step}")
 
     def load(self, load_path):
@@ -261,3 +279,8 @@ class Mario:
         print(f"Loading model at {load_path} with exploration rate {exploration_rate}")
         self.net.load_state_dict(state_dict)
         self.exploration_rate = exploration_rate
+        self.max_dict = ckp.get("max_dict")
+        self.max_world = ckp.get("max_world")
+        self.max_stage = ckp.get("max_stage")
+        self.curr_step = ckp.get("step")
+        self.curr_episode = ckp.get("episodes")

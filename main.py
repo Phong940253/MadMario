@@ -72,6 +72,7 @@ BUTTON_LAYOUT = {
 
 buttons = []
 for action_name, (x, y) in BUTTON_LAYOUT.items():
+    print(action_name, x, y)
     buttons.append(pygame.Rect(x, y, button_width, button_height))
 
 small_font = pygame.font.Font(None, 18)  # Smaller font size for buttons
@@ -89,13 +90,17 @@ game_width, game_height = 256 * 2, 240 * 2
 offset_x = (window_width - game_width) // 2
 offset_y = (window_height - game_height) // 2
 
-checkpoint = None  # Path('checkpoints/2020-10-21T18-25-27/mario.chkpt')
+checkpoint = Path("checkpoints/2025-01-16T19-47-16/mario_net_5.chkpt")
 mario = Mario(
     state_dim=(1, 84, 84),
     action_dim=env.action_space.n,
     save_dir=save_dir,
     checkpoint=checkpoint,
 )
+
+mario.curr_step = 250000
+mario.curr_episode = 39
+mario.reset_max_all()
 
 logger = MetricLogger(save_dir)
 
@@ -105,7 +110,7 @@ stages = range(1, 5)
 visualize = True
 
 ### for Loop that train the model num_episodes times by playing the game
-for e in range(episodes):
+for e in range(mario.curr_episode, episodes):
 
     state = env.reset()
     rbg_state = rbg_display.reset()
@@ -197,15 +202,15 @@ for e in range(episodes):
             screen.blit(details_surface_4, (10, 160))
 
             # Visualize weights
-            weights = mario.visualize_weights()
-            weights = (weights.cpu().numpy() * 255).astype(np.uint8)
-            for i in range(weights.shape[0]):
-                weight_surface = pygame.surfarray.make_surface(weights[i])
-                weight_surface = pygame.transform.scale(weight_surface, (84, 84))
-                # print((game_width + 10 + (i % 4) * 90, 10 + (i // 4) * 90))
-                screen.blit(
-                    weight_surface, (game_width + 10 + (i % 4) * 90, 10 + (i // 4) * 90)
-                )
+            # weights = mario.visualize_weights()
+            # weights = (weights.cpu().numpy() * 255).astype(np.uint8)
+            # for i in range(weights.shape[0]):
+            #     weight_surface = pygame.surfarray.make_surface(weights[i])
+            #     weight_surface = pygame.transform.scale(weight_surface, (84, 84))
+            #     # print((game_width + 10 + (i % 4) * 90, 10 + (i // 4) * 90))
+            #     screen.blit(
+            #         weight_surface, (game_width + 10 + (i % 4) * 90, 10 + (i // 4) * 90)
+            #     )
 
             pygame.display.update()
             clock.tick(60)
