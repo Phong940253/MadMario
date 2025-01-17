@@ -160,3 +160,16 @@ def display_training_done(screen, clock, normal_font, window_width, window_heigh
         screen.blit(text_surface, text_rect)
         pygame.display.flip()
         clock.tick(60)
+
+
+def display_switching_checkpoint(
+    screen, clock, normal_font, window_width, window_height
+):
+    screen.fill((0, 0, 0))  # Clear the screen with a black background
+    text_surface = normal_font.render(
+        "Syncing with the latest checkpoint...", True, (255, 255, 255)
+    )
+    text_rect = text_surface.get_rect(center=(window_width // 2, window_height // 2))
+    screen.blit(text_surface, text_rect)
+    pygame.display.flip()
+    clock.tick(60)

@@ -61,7 +61,7 @@ game_width, game_height = 256 * 2, 240 * 2
 offset_x = (window_width - game_width) // 2
 offset_y = (window_height - game_height) // 2
 
-checkpoint = Path("checkpoints/2025-01-17T02-05-24/mario_net_22.chkpt")
+checkpoint = Path("checkpoints/2025-01-17T12-38-42/mario_net_461.chkpt")
 # checkpoint = None
 
 mario = Mario(
@@ -187,23 +187,26 @@ with tqdm(total=episodes, initial=mario.curr_episode) as pbar:
             }
         )
 
-        webhook = DiscordWebhook(url=DISCORD_WEBHOOK_URL)
-        embed = DiscordEmbed(
-            title=f"Episode {e} finished!",
-            description="Mario finished an episode",
-            color="03b2f8",
-        )
+        if e % 10 == 0:
+            webhook = DiscordWebhook(url=DISCORD_WEBHOOK_URL)
+            embed = DiscordEmbed(
+                title=f"Episode {e} finished!",
+                description="Mario finished an episode",
+                color="03b2f8",
+            )
 
-        embed.add_embed_field(name="Episode", value=str(e))
-        embed.add_embed_field(name="Step", value=str(mario.curr_step))
-        embed.add_embed_field(name="Reward", value=str(logger.ep_rewards[-1]))
-        embed.add_embed_field(name="Length", value=str(logger.ep_lengths[-1]))
-        embed.add_embed_field(name="Avg Losses", value=str(logger.ep_avg_losses[-1]))
-        embed.add_embed_field(name="Avg Qs", value=str(logger.ep_avg_qs[-1]))
-        embed.add_embed_field(name="X Pos", value=str(info["x_pos"]))
-        embed.add_embed_field(name="Max X Pos", value=str(current_max["x_pos"]))
-        webhook.add_embed(embed)
-        webhook.execute()
+            embed.add_embed_field(name="Episode", value=str(e))
+            embed.add_embed_field(name="Step", value=str(mario.curr_step))
+            embed.add_embed_field(name="Reward", value=str(logger.ep_rewards[-1]))
+            embed.add_embed_field(name="Length", value=str(logger.ep_lengths[-1]))
+            embed.add_embed_field(
+                name="Avg Losses", value=str(logger.ep_avg_losses[-1])
+            )
+            embed.add_embed_field(name="Avg Qs", value=str(logger.ep_avg_qs[-1]))
+            embed.add_embed_field(name="X Pos", value=str(info["x_pos"]))
+            embed.add_embed_field(name="Max X Pos", value=str(current_max["x_pos"]))
+            webhook.add_embed(embed)
+            webhook.execute()
 
         if e % 20 == 0:
             logger.record(
@@ -213,25 +216,25 @@ with tqdm(total=episodes, initial=mario.curr_episode) as pbar:
                 logger.ep_rewards_plot,
                 DISCORD_WEBHOOK_URL,
                 "Episode Rewards",
-                f"current: {logger.ep_rewards[-1]}",
+                f"Avg ep reward: {logger.moving_avg_ep_rewards[-1]}",
             )
             send_discord_file(
                 logger.ep_lengths_plot,
                 DISCORD_WEBHOOK_URL,
                 "Episode Lengths",
-                f"current: {logger.ep_lengths[-1]}",
+                f"Avg ep length: {logger.moving_avg_ep_lengths[-1]}",
             )
             send_discord_file(
                 logger.ep_avg_losses_plot,
                 DISCORD_WEBHOOK_URL,
                 "Episode Avg Losses",
-                f"current: {logger.ep_avg_losses[-1]}",
+                f"Avg ep loss: {logger.moving_avg_ep_avg_losses[-1]}",
             )
             send_discord_file(
                 logger.ep_avg_qs_plot,
                 DISCORD_WEBHOOK_URL,
                 "Episode Avg Qs",
-                f"current: {logger.ep_avg_qs[-1]}",
+                f"Avg ep q: {logger.moving_avg_ep_avg_qs[-1]}",
             )
 
         pbar.update()
