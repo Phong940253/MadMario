@@ -4,6 +4,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 import random, datetime
 from pathlib import Path
+from discord_webhook import DiscordWebhook, DiscordEmbed
 
 import pygame
 import numpy as np
@@ -19,6 +20,7 @@ from wrappers import ResizeObservation, SkipFrame
 from tqdm import tqdm
 
 visualize = False
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1329514649800151121/jcFewfurS-xkT2_E6PMnJhO7OFUmPiJU9SvcSjzTz6cbABqv9LQVz8H6VvAeBVBnslxu"
 
 # Initialize Super Mario environment
 env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0")
@@ -93,7 +95,7 @@ game_width, game_height = 256 * 2, 240 * 2
 offset_x = (window_width - game_width) // 2
 offset_y = (window_height - game_height) // 2
 
-checkpoint = Path("checkpoints/2025-01-16T22-12-18/mario_net_7.chkpt")
+checkpoint = Path("checkpoints/2025-01-17T02-05-24/mario_net_22.chkpt")
 # checkpoint = None
 
 mario = Mario(
@@ -104,7 +106,7 @@ mario = Mario(
 )
 
 
-mario.curr_episode = 140
+# mario.curr_episode = 140
 # mario.curr_episode = 39
 # mario.reset_max_all()
 
@@ -113,6 +115,24 @@ logger = MetricLogger(save_dir)
 episodes = 100000
 worlds = range(1, 9)
 stages = range(1, 5)
+
+
+def send_discord_file(file_path, title, description):
+    webhook = DiscordWebhook(url=DISCORD_WEBHOOK_URL)
+
+    gen_file_name = file_path.name
+    with open(file_path, "rb") as f:
+        webhook.add_file(file=f.read(), filename=gen_file_name)
+
+    embed = DiscordEmbed(
+        title=title,
+        description=description,
+        color="03b2f8",
+    )
+    embed.set_thumbnail(url="attachment://" + gen_file_name)
+    webhook.add_embed(embed)
+    webhook.execute()
+
 
 ### for Loop that train the model num_episodes times by playing the game
 with tqdm(total=episodes, initial=mario.curr_episode) as pbar:
@@ -280,13 +300,52 @@ with tqdm(total=episodes, initial=mario.curr_episode) as pbar:
                 "ep_length": logger.ep_lengths[-1],
                 "ep_avg_losses": logger.ep_avg_losses[-1],
                 "ep_avg_qs": logger.ep_avg_qs[-1],
+                "x_pos": info["x_pos"],
                 "max_x_pos": current_max["x_pos"],
             }
         )
 
+        webhook = DiscordWebhook(url=DISCORD_WEBHOOK_URL)
+        embed = DiscordEmbed(
+            title=f"Episode {e} finished!",
+            description="Mario finished an episode",
+            color="03b2f8",
+        )
+
+        embed.add_embed_field(name="Episode", value=str(e))
+        embed.add_embed_field(name="Step", value=str(mario.curr_step))
+        embed.add_embed_field(name="Reward", value=str(logger.ep_rewards[-1]))
+        embed.add_embed_field(name="Length", value=str(logger.ep_lengths[-1]))
+        embed.add_embed_field(name="Avg Losses", value=str(logger.ep_avg_losses[-1]))
+        embed.add_embed_field(name="Avg Qs", value=str(logger.ep_avg_qs[-1]))
+        embed.add_embed_field(name="X Pos", value=str(info["x_pos"]))
+        embed.add_embed_field(name="Max X Pos", value=str(current_max["x_pos"]))
+        webhook.add_embed(embed)
+        webhook.execute()
+
         if e % 20 == 0:
             logger.record(
                 episode=e, epsilon=mario.exploration_rate, step=mario.curr_step
+            )
+            send_discord_file(
+                logger.ep_rewards_plot,
+                "Episode Rewards",
+                f"current: {logger.ep_rewards[-1]}",
+            )
+            send_discord_file(
+                logger.ep_lengths_plot,
+                "Episode Lengths",
+                f"current: {logger.ep_lengths[-1]}",
+            )
+            send_discord_file(
+                logger.ep_avg_losses_plot,
+                "Episode Avg Losses",
+                f"current: {logger.ep_avg_losses[-1]}",
+            )
+            send_discord_file(
+                logger.ep_avg_qs_plot,
+                "Episode Avg Qs",
+                f"current: {logger.ep_avg_qs[-1]}",
             )
 
         pbar.update()

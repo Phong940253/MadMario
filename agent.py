@@ -97,7 +97,13 @@ class Mario:
         if info["score"] > self.max_dict[(world, stage)]["score"]:
             self.max_dict[(world, stage)]["score"] = info["score"]
         if win:
-            if info["time_left"] > self.max_dict[(world, stage)]["time_left"]:
+            if "time_left" not in self.max_dict[(world, stage)]:
+                self.max_dict[(world, stage)]["time_left"] = 0
+
+            if (
+                "time_left" in info
+                and info["time_left"] > self.max_dict[(world, stage)]["time_left"]
+            ):
                 self.max_dict[(world, stage)]["time_left"] = info["time_left"]
         if info["coins"] > self.max_dict[(world, stage)]["coins"]:
             self.max_dict[(world, stage)]["coins"] = info["coins"]
