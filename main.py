@@ -27,6 +27,8 @@ DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1329514649800151121/jcFe
 # Initialize Super Mario environment
 env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0")
 
+SKIP = 4
+
 # Limit the action-space to
 #   0. walk right
 #   1. jump right
@@ -34,7 +36,7 @@ env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0")
 env = JoypadSpace(env, COMPLEX_MOVEMENT)
 
 # Apply Wrappers to environment
-env = SkipFrame(env, skip=2)
+env = SkipFrame(env, skip=SKIP)
 
 # rbg_display is used to display the game
 rbg_display = env
@@ -42,7 +44,7 @@ rbg_display = env
 env = GrayScaleObservation(env, keep_dim=False)
 env = ResizeObservation(env, shape=84)
 env = TransformObservation(env, f=lambda x: x / 255.0)
-env = FrameStack(env, num_stack=2)
+env = FrameStack(env, num_stack=SKIP)
 env.reset()
 
 # Create a separate environment for display
@@ -61,14 +63,15 @@ game_width, game_height = 256 * 2, 240 * 2
 offset_x = (window_width - game_width) // 2
 offset_y = (window_height - game_height) // 2
 
-checkpoint = Path("checkpoints/2025-01-17T12-38-42/mario_net_461.chkpt")
-# checkpoint = None
+# checkpoint = Path("checkpoints/2025-01-17T14-17-46/mario_net_878.chkpt")
+checkpoint = None
 
 mario = Mario(
-    state_dim=(2, 84, 84),
+    state_dim=(SKIP, 84, 84),
     action_dim=env.action_space.n,
     save_dir=save_dir,
     checkpoint=checkpoint,
+    use_dml=True,
 )
 
 
@@ -78,7 +81,7 @@ mario = Mario(
 
 logger = MetricLogger(save_dir)
 
-episodes = 100000
+episodes = 10
 worlds = range(1, 9)
 stages = range(1, 5)
 
@@ -187,7 +190,7 @@ with tqdm(total=episodes, initial=mario.curr_episode) as pbar:
             }
         )
 
-        if e % 10 == 0:
+        if e % 20 == 0:
             webhook = DiscordWebhook(url=DISCORD_WEBHOOK_URL)
             embed = DiscordEmbed(
                 title=f"Episode {e} finished!",
@@ -212,6 +215,7 @@ with tqdm(total=episodes, initial=mario.curr_episode) as pbar:
             logger.record(
                 episode=e, epsilon=mario.exploration_rate, step=mario.curr_step
             )
+        if e % 100 == 0:
             send_discord_file(
                 logger.ep_rewards_plot,
                 DISCORD_WEBHOOK_URL,
