@@ -21,7 +21,7 @@ from visualizer import initialize_pygame, visualize_game, display_training_done
 import pygame
 from utils import send_discord_file
 
-visualize = True
+visualize = False
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1329514649800151121/jcFewfurS-xkT2_E6PMnJhO7OFUmPiJU9SvcSjzTz6cbABqv9LQVz8H6VvAeBVBnslxu"
 
 # Initialize Super Mario environment

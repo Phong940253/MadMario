@@ -1,9 +1,8 @@
-import random, datetime
+import datetime
 from pathlib import Path
 
 import pygame
 import numpy as np
-import gym
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import COMPLEX_MOVEMENT
 from gym.wrappers import FrameStack, GrayScaleObservation, TransformObservation
@@ -12,6 +11,7 @@ from nes_py.wrappers import JoypadSpace
 from metrics import MetricLogger
 from agent import Mario
 from wrappers import ResizeObservation, SkipFrame
+from visualizer import initialize_pygame, visualize_game, display_training_done
 
 env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0")
 
@@ -31,8 +31,6 @@ env.reset()
 rbg_display = FrameStack(rbg_display, num_stack=2)
 rbg_display.reset()
 
-pygame.init()
-
 window_width, window_height = 256 * 2, 240 * 2 * 2
 game_width, game_height = 256 * 2, 240 * 2
 
@@ -40,9 +38,10 @@ game_width, game_height = 256 * 2, 240 * 2
 offset_x = (window_width - game_width) // 2
 offset_y = (window_height - game_height) // 2
 
-screen = pygame.display.set_mode((window_width, window_height))
-clock = pygame.time.Clock()
-font = pygame.font.Font(None, 30)
+screen, clock, font, BUTTON_LIST, buttons, small_font, normal_font, BUTTON_LAYOUT = (
+    initialize_pygame(window_width, window_height)
+)
+
 fps_text = None
 fps_history_100 = []
 fps_history_1000 = []
@@ -63,6 +62,7 @@ mario.exploration_rate = mario.exploration_rate_min
 logger = MetricLogger(save_dir)
 
 episodes = 100
+current_max = {"x_pos": 0, "score": 0, "coins": 0, "time_left": 0}
 
 for e in range(episodes):
 
@@ -74,48 +74,39 @@ for e in range(episodes):
             if event.type == pygame.QUIT:
                 pygame.quit()
                 exit()
-        # 3. Show environment (the visual)
-        # from (2, 240, 256, 3) to (240, 256, 3)
-        for frame in rbg_state:
-            frame = np.transpose(frame, (1, 0, 2))
-            surface = pygame.surfarray.make_surface(frame)
-            scaled_surface = pygame.transform.scale(surface, (game_width, game_height))
-
-            # Center the game display in the window
-            screen.fill((0, 0, 0))  # Clear the screen with a black background
-            screen.blit(scaled_surface, (offset_x, offset_y))
-
-            fps = clock.get_fps()
-            fps_history_100.append(fps)
-            fps_history_1000.append(fps)
-            if len(fps_history_100) > 100:
-                fps_history_100.pop(0)
-            if len(fps_history_1000) > 1000:
-                fps_history_1000.pop(0)
-
-            fps_1_percent = (
-                sorted(fps_history_100)[int(len(fps_history_100) * 0.01)]
-                if len(fps_history_100) > 0
-                else 0
-            )
-            fps_01_percent = (
-                sorted(fps_history_1000)[int(len(fps_history_1000) * 0.001)]
-                if len(fps_history_1000) > 0
-                else 0
-            )
-
-            fps_text = font.render(
-                f"FPS: {fps:.2f}  1%: {fps_1_percent:.2f}  0.1%: {fps_01_percent:.2f}",
-                True,
-                (255, 255, 255),
-            )
-            screen.blit(fps_text, (10, 10))
-            pygame.display.update()
-            clock.tick(60)
 
         action = mario.act(state)
 
         next_state, reward, done, info = env.step(action)
+
+        mario.update_max(info)
+        current_max = mario.get_max(info["world"], info["stage"])
+        # 3. Show environment (the visual)
+        # from (2, 240, 256, 3) to (240, 256, 3)
+
+        visualize_game(
+            screen,
+            clock,
+            font,
+            BUTTON_LIST,
+            buttons,
+            small_font,
+            normal_font,
+            BUTTON_LAYOUT,
+            rbg_state,
+            game_width,
+            game_height,
+            offset_x,
+            offset_y,
+            action,
+            info,
+            e,
+            mario,
+            logger,
+            current_max,
+            window_width,
+            window_height,
+        )
 
         mario.cache(state, next_state, action, reward, done)
 
@@ -123,10 +114,15 @@ for e in range(episodes):
 
         state = next_state
 
-        if done or info["flag_get"]:
+        if info["flag_get"]:
+            mario.update_max(info, win=True)
+
+        if done and not info["flag_get"]:
             break
 
     logger.log_episode()
 
     if e % 20 == 0:
         logger.record(episode=e, epsilon=mario.exploration_rate, step=mario.curr_step)
+
+display_training_done(screen, clock, normal_font, window_width, window_height)
