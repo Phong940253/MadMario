@@ -24,10 +24,12 @@ class Mario:
         self.learn_every = 3  # no. of experiences between updates to Q_online
         self.sync_every = 1e4  # no. of experiences between Q_target & Q_online sync
 
-        self.save_every = 5e4  # no. of experiences between saving Mario Net
+        self.save_every = 1e5  # no. of experiences between saving Mario Net
         self.save_dir = save_dir
 
+        self.use_dml = True
         self.use_cuda = torch.cuda.is_available()
+        self.device = None
         self.max_dict = dict()
         for world in range(1, 9):
             for stage in range(1, 5):
@@ -42,8 +44,14 @@ class Mario:
 
         # Mario's DNN to predict the most optimal action - we implement this in the Learn section
         self.net = MarioNet(self.state_dim, self.action_dim).float()
-        if self.use_cuda:
-            self.net = self.net.to(device="cuda")
+        if self.use_dml:
+            import torch_directml
+
+            self.device = torch_directml.device(torch_directml.default_device())
+        else:
+            self.device = torch.device("cuda" if self.use_cuda else "cpu")
+
+        self.net = self.net.to(self.device)
         if checkpoint:
             self.load(checkpoint)
 
@@ -131,12 +139,7 @@ class Mario:
 
         # EXPLOIT
         else:
-            state = (
-                torch.FloatTensor(np.array(state)).cuda()
-                if self.use_cuda
-                else torch.FloatTensor(np.array(state))
-            )
-            state = state.unsqueeze(0)
+            state = torch.FloatTensor(np.array(state)).to(self.device).unsqueeze(0)
             action_values = self.net(state, model="online")
             action_idx = torch.argmax(action_values, axis=1).item()  # type: ignore
 
@@ -159,31 +162,11 @@ class Mario:
         reward (float),
         done(bool))
         """
-        state = (
-            torch.FloatTensor(np.array(state)).cuda()
-            if self.use_cuda
-            else torch.FloatTensor(np.array(state))
-        )
-        next_state = (
-            torch.FloatTensor(np.array(next_state)).cuda()
-            if self.use_cuda
-            else torch.FloatTensor(np.array(next_state))
-        )
-        action = (
-            torch.LongTensor(np.array([action])).cuda()
-            if self.use_cuda
-            else torch.LongTensor(np.array([action]))
-        )
-        reward = (
-            torch.DoubleTensor(np.array([reward])).cuda()
-            if self.use_cuda
-            else torch.DoubleTensor(np.array([reward]))
-        )
-        done = (
-            torch.BoolTensor(np.array([done])).cuda()
-            if self.use_cuda
-            else torch.BoolTensor(np.array([done]))
-        )
+        state = torch.FloatTensor(np.array(state)).to(self.device)
+        next_state = torch.FloatTensor(np.array(next_state)).to(self.device)
+        action = torch.LongTensor(np.array([action])).to(self.device)
+        reward = torch.DoubleTensor(np.array([reward])).to(self.device)
+        done = torch.BoolTensor(np.array([done])).to(self.device)
 
         self.memory.append(
             (
@@ -275,13 +258,21 @@ class Mario:
             save_path,
         )
 
+        # Limit to 10 saved files
+        saved_files = sorted(
+            Path(self.save_dir).iterdir(), key=lambda f: f.stat().st_mtime
+        )
+        if len(saved_files) > 10:
+            file_to_delete = saved_files[0]
+            file_to_delete.unlink()
+
         # print(f"MarioNet saved to {save_path} at step {self.curr_step}")
 
     def load(self, load_path):
         if not load_path.exists():
             raise ValueError(f"{load_path} does not exist")
 
-        ckp = torch.load(load_path, map_location=("cuda" if self.use_cuda else "cpu"))
+        ckp = torch.load(load_path, map_location=(self.device))
         exploration_rate = ckp.get("exploration_rate")
         state_dict = ckp.get("model")
 
