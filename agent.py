@@ -165,20 +165,24 @@ class Mario:
         reward (float),
         done(bool))
         """
-        state = torch.FloatTensor(np.array(state)).to(self.device)
-        next_state = torch.FloatTensor(np.array(next_state)).to(self.device)
-        action = torch.LongTensor(np.array([action])).to(self.device)
-        reward = torch.DoubleTensor(np.array([reward])).to(self.device)
-        done = torch.BoolTensor(np.array([done])).to(self.device)
+
+        while True:
+            try:
+                state_tensor = torch.FloatTensor(np.array(state)).to(self.device)
+                next_state_tensor = torch.FloatTensor(np.array(next_state)).to(
+                    self.device
+                )
+                action_tensor = torch.LongTensor(np.array([action])).to(self.device)
+                reward_tensor = torch.DoubleTensor(np.array([reward])).to(self.device)
+                done_tensor = torch.BoolTensor(np.array([done])).to(self.device)
+                break
+            except Exception as e:
+                print(e)
+                # print("Out of memory, reducing memory size")
+                _ = [self.memory.popleft() for _ in range(1000)]
 
         self.memory.append(
-            (
-                state,
-                next_state,
-                action,
-                reward,
-                done,
-            )
+            (state_tensor, next_state_tensor, action_tensor, reward_tensor, done_tensor)
         )
 
     def recall(self):
@@ -215,33 +219,37 @@ class Mario:
         self.net.target.load_state_dict(self.net.online.state_dict())
 
     def learn(self):
-        if self.curr_step % self.sync_every == 0:
-            self.sync_Q_target()
+        while True:
+            try:
+                if self.curr_step % self.sync_every == 0:
+                    self.sync_Q_target()
 
-        if self.curr_step % self.save_every == 0:
-            self.save()
+                if self.curr_step % self.save_every == 0:
+                    self.save()
 
-        if self.curr_step < self.burnin:
-            return None, None
+                if self.curr_step < self.burnin:
+                    return None, None
 
-        if self.curr_step % self.learn_every != 0:
-            return None, None
+                if self.curr_step % self.learn_every != 0:
+                    return None, None
 
-        if len(self.memory) < self.batch_size:
-            return None, None
+                if len(self.memory) < self.batch_size:
+                    return None, None
 
-        # Sample from memory
-        state, next_state, action, reward, done = self.recall()
+                # Sample from memory
+                state, next_state, action, reward, done = self.recall()
 
-        # Get TD Estimate
-        td_est = self.td_estimate(state, action)
+                # Get TD Estimate
+                td_est = self.td_estimate(state, action)
 
-        # Get TD Target
-        td_tgt = self.td_target(reward, next_state, done)
+                # Get TD Target
+                td_tgt = self.td_target(reward, next_state, done)
 
-        # Backpropagate loss through Q_online
-        loss = self.update_Q_online(td_est, td_tgt)
-
+                # Backpropagate loss through Q_online
+                loss = self.update_Q_online(td_est, td_tgt)
+                break
+            except Exception as e:
+                _ = [self.memory.popleft() for _ in range(1000)]
         return (td_est.mean().item(), loss)
 
     def save(self):
