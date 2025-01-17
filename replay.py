@@ -1,5 +1,4 @@
 import random, datetime
-import random, datetime
 from pathlib import Path
 
 import pygame
@@ -44,6 +43,10 @@ offset_y = (window_height - game_height) // 2
 screen = pygame.display.set_mode((window_width, window_height))
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 30)
+fps_text = None
+fps_history_100 = []
+fps_history_1000 = []
+
 
 save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
@@ -72,18 +75,43 @@ for e in range(episodes):
                 pygame.quit()
                 exit()
         # 3. Show environment (the visual)
-        # from (4, 240, 256, 3) to (240, 256, 3)
-        frame = rbg_state[0]
-        frame = np.transpose(frame, (1, 0, 2))
-        surface = pygame.surfarray.make_surface(frame)
-        scaled_surface = pygame.transform.scale(surface, (game_width, game_height))
+        # from (2, 240, 256, 3) to (240, 256, 3)
+        for frame in rbg_state:
+            frame = np.transpose(frame, (1, 0, 2))
+            surface = pygame.surfarray.make_surface(frame)
+            scaled_surface = pygame.transform.scale(surface, (game_width, game_height))
 
-        # Center the game display in the window
-        screen.fill((0, 0, 0))  # Clear the screen with a black background
-        screen.blit(scaled_surface, (offset_x, offset_y))
+            # Center the game display in the window
+            screen.fill((0, 0, 0))  # Clear the screen with a black background
+            screen.blit(scaled_surface, (offset_x, offset_y))
 
-        pygame.display.update()
-        clock.tick(60)
+            fps = clock.get_fps()
+            fps_history_100.append(fps)
+            fps_history_1000.append(fps)
+            if len(fps_history_100) > 100:
+                fps_history_100.pop(0)
+            if len(fps_history_1000) > 1000:
+                fps_history_1000.pop(0)
+
+            fps_1_percent = (
+                sorted(fps_history_100)[int(len(fps_history_100) * 0.01)]
+                if len(fps_history_100) > 0
+                else 0
+            )
+            fps_01_percent = (
+                sorted(fps_history_1000)[int(len(fps_history_1000) * 0.001)]
+                if len(fps_history_1000) > 0
+                else 0
+            )
+
+            fps_text = font.render(
+                f"FPS: {fps:.2f}  1%: {fps_1_percent:.2f}  0.1%: {fps_01_percent:.2f}",
+                True,
+                (255, 255, 255),
+            )
+            screen.blit(fps_text, (10, 10))
+            pygame.display.update()
+            clock.tick(60)
 
         action = mario.act(state)
 
