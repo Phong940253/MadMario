@@ -7,7 +7,7 @@ from collections import deque
 
 
 class Mario:
-    def __init__(self, state_dim, action_dim, save_dir, checkpoint=None):
+    def __init__(self, state_dim, action_dim, save_dir, checkpoint=None, use_dml=True):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.memory = deque(maxlen=100000)
@@ -24,10 +24,10 @@ class Mario:
         self.learn_every = 3  # no. of experiences between updates to Q_online
         self.sync_every = 1e4  # no. of experiences between Q_target & Q_online sync
 
-        self.save_every = 1e5  # no. of experiences between saving Mario Net
+        self.save_every = 5e4  # no. of experiences between saving Mario Net
         self.save_dir = save_dir
 
-        self.use_dml = True
+        self.use_dml = use_dml
         self.use_cuda = torch.cuda.is_available()
         self.device = None
         self.max_dict = dict()
@@ -55,7 +55,10 @@ class Mario:
         if checkpoint:
             self.load(checkpoint)
 
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.00025)  # type: ignore
+        # self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.00025)  # type: ignore
+        self.optimizer = torch.optim.SGD(
+            self.net.parameters(), lr=0.00025, momentum=0.9
+        )
         self.loss_fn = torch.nn.SmoothL1Loss()
 
     def visualize_weights(self):
@@ -272,12 +275,13 @@ class Mario:
         if not load_path.exists():
             raise ValueError(f"{load_path} does not exist")
 
-        ckp = torch.load(load_path, map_location=(self.device))
+        ckp = torch.load(load_path, map_location=("cuda" if self.use_cuda else "cpu"))
         exploration_rate = ckp.get("exploration_rate")
         state_dict = ckp.get("model")
 
         print(f"Loading model at {load_path} with exploration rate {exploration_rate}")
         self.net.load_state_dict(state_dict)
+        self.net = self.net.to(self.device)
         self.exploration_rate = exploration_rate
         self.max_dict = ckp.get("max_dict")
         self.max_world = ckp.get("max_world")
